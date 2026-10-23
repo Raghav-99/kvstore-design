@@ -48,6 +48,7 @@ public class Engine implements Commands {
 
     @Override
     public byte[] get(String key) throws IOException {
+        logger.info("get started for key: {}", key);
         KeydirEntry record = keydir.get(key);
         if(record != null) {
             FileChannel channel = record.getHandle().getRChannel().position(record.getValOffset());
@@ -104,6 +105,7 @@ public class Engine implements Commands {
     @Override
     // todo: make sure is buffer is being fully utilized
     public boolean put(StoreHandle handle, String key, byte[] value) throws IOException {
+        logger.info("put started for key: {}, value size: {}", key, value.length);
         final int tmstmpSz = 8, crcSz = 8;
         final long keySz=4L+key.length(), valSz = 4L+value.length;
         FileChannel channel = handle.getWChannel();
@@ -113,7 +115,7 @@ public class Engine implements Commands {
         // 4 bytes for key length plus the bytes of key itself, 4 bytes for value length plus the bytes of value itself
         // todo: remove redundant chunksize?
         long chunkSize = crcSz + tmstmpSz + keySz + valSz;
-        logger.info("chunk size(={}) = crcSz(={}) + tmstmpSz(={}) + keySz(=4+{}) + valSz(=4+{})", chunkSize, crcSz, tmstmpSz, key.length(), value.length);
+        logger.debug("write: chunk size(={}) = crcSz(={}) + tmstmpSz(={}) + keySz(=4+{}) + valSz(=4+{})", chunkSize, crcSz, tmstmpSz, key.length(), value.length);
         long timestamp = Instant.now().toEpochMilli();
         // always in big-endian
         ByteBuffer wbf = buffer.clear();
@@ -122,15 +124,15 @@ public class Engine implements Commands {
         wbf.putLong(1000L);
         wbf.putLong(timestamp);
         wbf.putInt(key.length());
-        logger.info("buffer remanining size is {} bytes to write the rest of {} bytes", wbf.remaining(), chunkSize-20);
+        logger.debug("write: buffer remanining size is {} bytes to write the rest of {} bytes", wbf.remaining(), chunkSize-20);
         int wc = writeChunks(wbf, channel, key.getBytes());
-        logger.info("key: {} of size {} was written with {} bytes. Buffer size now is: {}", key, key.length(), wc, wbf.remaining());
+        logger.info("disk write: key {} of size {} was written with {} bytes. Buffer size now is: {}", key, key.length(), wc, wbf.remaining());
         if(wc > 0 && wbf.hasRemaining()) // this cond must always eval to true else something is seriously wrong with buffer
         {
             wbf.putInt(value.length);
             // channel.write(wbf);
             wc = writeChunks(wbf, channel, value);
-            logger.info("value: {} of size was written with {} bytes.", value.length, wc);
+            logger.info("disk write: key {} whose value is size {} was written with {} bytes.", key, value.length, wc);
             if(wc > 0) {
                 channel.force(false);
                 keydir.put(key, handle, timestamp, pos);
@@ -195,6 +197,7 @@ public class Engine implements Commands {
 
     @Override
     public boolean delete(String key) {
+        logger.info("delete started for key: {}", key);
         return keydir.delete(key);
     }
 

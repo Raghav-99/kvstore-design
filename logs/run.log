@@ -1,0 +1,19 @@
+600  [main] INFO  io.practice.kvstore.v1.core.Engine -- New store.log was created
+16827 [main] INFO  io.practice.kvstore.App -- get: key=name, value=
+37211 [main] INFO  io.practice.kvstore.v1.core.Engine -- chunk size(=34) = crcSz(=8) + tmstmpSz(=8) + keySz(=4+4) + valSz(=4+6)
+37212 [main] INFO  io.practice.kvstore.v1.core.Engine -- buffer remanining size is 1004 bytes to write the rest of 14 bytes
+37212 [main] INFO  io.practice.kvstore.v1.core.Engine -- write: 4 bytes were written to buffer
+37213 [main] INFO  io.practice.kvstore.v1.core.Engine -- write: 24 bytes were written to store.log
+37213 [main] INFO  io.practice.kvstore.v1.core.Engine -- a total of 24 bytes were written into store.log
+37213 [main] INFO  io.practice.kvstore.v1.core.Engine -- key: name of size 4 was written with 24 bytes. Buffer size now is: 1024
+37213 [main] INFO  io.practice.kvstore.v1.core.Engine -- write: 6 bytes were written to buffer
+37213 [main] INFO  io.practice.kvstore.v1.core.Engine -- write: 10 bytes were written to store.log
+37213 [main] INFO  io.practice.kvstore.v1.core.Engine -- a total of 10 bytes were written into store.log
+37214 [main] INFO  io.practice.kvstore.v1.core.Engine -- value: 6 of size was written with 10 bytes.
+37219 [main] INFO  io.practice.kvstore.App -- put: true for key name
+52885 [main] INFO  io.practice.kvstore.v1.core.Engine -- get: value size is 6
+52885 [main] INFO  io.practice.kvstore.v1.core.Engine -- get: read 6 bytes from store.log
+52885 [main] INFO  io.practice.kvstore.v1.core.Engine -- get: returned value of size 6 bytes
+52885 [main] INFO  io.practice.kvstore.App -- get: key=name, value=raghav
+60264 [main] INFO  io.practice.kvstore.App -- del: true for key name
+71534 [main] INFO  io.practice.kvstore.App -- get: key=name, value=

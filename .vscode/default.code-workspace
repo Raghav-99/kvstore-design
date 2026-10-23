@@ -1,0 +1,11 @@
+{
+    "folders": [
+        {
+            "path": "../",
+            "name": "kvstore-design"
+        }
+    ],
+    "settings": {
+        "java.configuration.updateBuildConfiguration": "interactive"
+    }
+}

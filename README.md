@@ -1,4 +1,6 @@
-Goal: Implement the most basic functionality of a key-value store inspired from Bitcask.
+[![Unit tests](https://github.com/Raghav-99/kvstore-design/actions/workflows/action.yaml/badge.svg)](https://github.com/Raghav-99/kvstore-design/actions/workflows/action.yaml)
+
+v1 Goal: Implement the most basic functionality of a key-value store inspired from Bitcask.
 
 Features in scope:
 - Basic key-value storage with put and get operations.

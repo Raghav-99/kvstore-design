@@ -51,6 +51,7 @@ public class App {
                     }
                 }
             }while(ch.compareToIgnoreCase("n") != 0);
+            engine.close(handle);
             sc.close();
         } catch (Exception e) {
             logger.error("Error occurred: {}", Arrays.toString(e.getStackTrace()));

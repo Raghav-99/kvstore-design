@@ -84,21 +84,22 @@ public class Engine implements Commands {
         int valSz = rbf.getInt(0);
         logger.info("get: value size is {}", valSz);
         byte[] val = new byte[valSz];
+        
         int oVal = 0, rc = 0;
-        rbf.clear().limit(valSz);
         do {
+            rbf.clear().limit(Math.min(valSz - oVal, rbf.capacity()));
             int c = channel.read(rbf);
             if(c == -1) {
-                logger.info("get: eof encountered");
+                logger.info("disk read: eof encountered");
                 return null;
             }
-            logger.info("get: read {} bytes from store.log", c);
+            logger.info("disk read: read {} bytes from store.log", c);
             rc += c;
             rbf.flip().get(val, oVal, c);
             oVal += c;
         }while(rc < valSz);
         rbf.clear();
-        logger.info("get: returned value of size {} bytes", val.length);
+        logger.info("disk read: returned value of size {} bytes", val.length);
         return val;
     }
 
@@ -161,7 +162,7 @@ public class Engine implements Commands {
             if(!wbf.hasRemaining() || offset >= l) {
                 int n = channel.write(wbf.flip());
                 wc += n;
-                logger.info("write: {} bytes were written to store.log", n);
+                logger.info("disk write: {} bytes were written to store.log", n);
                 wbf.clear();
             }
             else {
@@ -199,6 +200,14 @@ public class Engine implements Commands {
     public boolean delete(String key) {
         logger.info("delete started for key: {}", key);
         return keydir.delete(key);
+    }
+
+    @Override
+    public void close(StoreHandle handle) throws Exception {
+        if(handle != null) {
+            handle.close();
+            logger.info("closed open channels");
+        }
     }
 
 }

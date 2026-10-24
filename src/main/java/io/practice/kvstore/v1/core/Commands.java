@@ -8,4 +8,5 @@ public interface Commands {
     byte[] get(String key) throws IOException;
     boolean put(StoreHandle handle, String key, byte[] value) throws IOException;
     boolean delete(String key);
+    void close(StoreHandle handle) throws Exception;
 }

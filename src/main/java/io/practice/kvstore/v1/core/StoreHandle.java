@@ -17,4 +17,13 @@ public class StoreHandle {
         this.wChannel = wChannel;
         // this.fd = fileDescriptor;
     }
+
+    public void close() throws Exception {
+        if(rChannel != null) {
+            rChannel.close();
+        }
+        if(wChannel != null) {
+            wChannel.close();
+        }
+    }
 }

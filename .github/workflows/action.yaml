@@ -1,4 +1,4 @@
-name: kvstore build and test validation
+name: Unit tests
 
 on:
     push:

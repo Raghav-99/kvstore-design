@@ -1,11 +1,21 @@
 {
     "folders": [
         {
-            "path": "../",
-            "name": "kvstore-design"
+            "path": "../.github",
+            "name": "workflows"
+        },
+        {
+            "path": "../kvstore-client",
+            "name": "kvstore-client"
+        },
+        {
+            "path": "../kvstore-server",
+            "name": "kvstore-server"
         }
     ],
     "settings": {
-        "java.configuration.updateBuildConfiguration": "interactive"
+        "java.configuration.updateBuildConfiguration": "automatic",
+        "java.import.maven.enabled": true,
+        "java.import.projectSelection": "automatic"
     }
 }

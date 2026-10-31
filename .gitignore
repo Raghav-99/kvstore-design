@@ -1,3 +1,4 @@
 **/target/*
 *.class
-db/store.log
+**/db/store.log
+**/logs/run.log

@@ -1,15 +1,21 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
             "type": "java",
-            "name": "App",
+            "name": "Server",
             "request": "launch",
-            "mainClass": "io.practice.kvstore.App",
-            "projectName": "kvstore-design"
+            "mainClass": "io.practice.kvstore.server.App",
+            "projectName": "kvstore-server",
+            "cwd": "${workspaceFolder}/kvstore-server"
+        },
+        {
+            "type": "java",
+            "name": "Client",
+            "request": "launch",
+            "mainClass": "io.practice.kvstore.client.Main",
+            "projectName": "kvstore-client",
+            "cwd": "${workspaceFolder}/kvstore-client"
         }
     ]
 }

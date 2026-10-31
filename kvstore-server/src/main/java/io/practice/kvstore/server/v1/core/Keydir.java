@@ -3,7 +3,6 @@ package io.practice.kvstore.server.v1.core;
 import java.util.HashMap;
 import java.util.Map;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 public class Keydir {

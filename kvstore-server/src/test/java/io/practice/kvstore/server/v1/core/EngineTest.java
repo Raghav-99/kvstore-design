@@ -36,7 +36,7 @@ public class EngineTest {
         @Test 
         void KeyValueLessThan1KBTest() throws IOException {
             String key = "test", value = "hello world";
-            assertTrue(engine.put(handle, key, value.getBytes(charset)));
+            assertTrue(engine.put(handle, key, value.getBytes()));
             byte[] res = engine.get(key);
             assertEquals(value, new String(res));
         }

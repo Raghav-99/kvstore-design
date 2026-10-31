@@ -1,8 +1,5 @@
 package io.practice.kvstore.server.v1.core;
 
-import java.io.FileDescriptor;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
 import java.nio.channels.FileChannel;
 
 import lombok.Getter;

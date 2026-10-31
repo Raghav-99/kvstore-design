@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -11,12 +12,13 @@ import org.slf4j.LoggerFactory;
 
 import io.practice.kvstore.server.v1.core.Keydir.KeydirEntry;
 
+// uses a singular dedicated buffer for now
 public class Engine implements Commands {
     private final Logger logger = LoggerFactory.getLogger(this.getClass()); 
     private final Keydir keydir = new Keydir();
     final String HEADER = "%kvstore.v1";
-    // final byte[] buffer = new byte[1024]; 
     final ByteBuffer buffer = ByteBuffer.wrap(new byte[1024]);
+    
     @Override
     public StoreHandle open(File file) throws IOException {
         boolean isNewFile = !file.exists();
@@ -46,15 +48,17 @@ public class Engine implements Commands {
         return new StoreHandle(rChannel, wChannel);
     }
 
+    // todo: enforce chunk by chunk reading like put
     @Override
     public byte[] get(String key) throws IOException {
         logger.info("get started for key: {}", key);
+        ByteBuffer rbf = buffer;
         KeydirEntry record = keydir.get(key);
         if(record != null) {
             FileChannel channel = record.getHandle().getRChannel().position(record.getValOffset());
-            ByteBuffer rbf = buffer.clear();
-            // rbf.clear(); // only applicable for v1
-            if(isCrcValid(channel)) {
+            
+            rbf.clear(); // only applicable for v1
+            if(isCrcValid(channel, rbf)) {
                 // todo: consolidate this with crc calc
                 // shift to val offset now
                 channel.position(channel.position() + 12 + key.length()); // 8 bytes for tmstamp, 4 bytes for keySz and rest actual key size
@@ -64,8 +68,7 @@ public class Engine implements Commands {
         return null;
     }
     
-    private boolean isCrcValid(FileChannel channel) throws IOException {
-        ByteBuffer rbf = buffer;
+    private boolean isCrcValid(FileChannel channel, ByteBuffer rbf) throws IOException {
         // channel = channel.position(channel.position()/*  + 8*/); // crc offset
         rbf.limit(8);
         channel.read(rbf);
@@ -77,7 +80,6 @@ public class Engine implements Commands {
 
     // todo: add streaming later
     // todo: add buffer underflow handling
-    // todo: handle buffer capacity shouldn't exceed 1kB
     private byte[] readChunks(ByteBuffer rbf, FileChannel channel) throws IOException {
         rbf.limit(4);
         channel.read(rbf);
@@ -103,97 +105,38 @@ public class Engine implements Commands {
         return val;
     }
 
+    // todo: support utf-16
     @Override
-    // todo: make sure is buffer is being fully utilized
     public boolean put(StoreHandle handle, String key, byte[] value) throws IOException {
         logger.info("put started for key: {}, value size: {}", key, value.length);
-        final int tmstmpSz = 8, crcSz = 8;
-        final long keySz=4L+key.length(), valSz = 4L+value.length;
+        final int tmstmpSz = 8, crcSz = 8, keySz=4+key.length(), valSz = 4+value.length;
         FileChannel channel = handle.getWChannel();
         long pos = channel.position();
         
         // first 8 bytes is the size of whole chunk, 8 and 8 bytes for crc and tmstamp, 
         // 4 bytes for key length plus the bytes of key itself, 4 bytes for value length plus the bytes of value itself
-        // todo: remove redundant chunksize?
         long chunkSize = crcSz + tmstmpSz + keySz + valSz;
-        logger.debug("write: chunk size(={}) = crcSz(={}) + tmstmpSz(={}) + keySz(=4+{}) + valSz(=4+{})", chunkSize, crcSz, tmstmpSz, key.length(), value.length);
+        logger.debug("put: chunk size(={}) = crcSz(={}) + tmstmpSz(={}) + keySz(=4+{}) + valSz(=4+{})", chunkSize, crcSz, tmstmpSz, key.length()*2, value.length);
         long timestamp = Instant.now().toEpochMilli();
-        // always in big-endian
-        ByteBuffer wbf = buffer.clear();
-        // wbf.putLong(chunkSize);
         // todo: add real crc value
-        wbf.putLong(1000L);
-        wbf.putLong(timestamp);
-        wbf.putInt(key.length());
-        logger.debug("write: buffer remanining size is {} bytes to write the rest of {} bytes", wbf.remaining(), chunkSize-20);
-        int wc = writeChunks(wbf, channel, key.getBytes());
-        logger.info("disk write: key {} of size {} was written with {} bytes. Buffer size now is: {}", key, key.length(), wc, wbf.remaining());
-        if(wc > 0 && wbf.hasRemaining()) // this cond must always eval to true else something is seriously wrong with buffer
-        {
-            wbf.putInt(value.length);
-            // channel.write(wbf);
-            wc = writeChunks(wbf, channel, value);
-            logger.info("disk write: key {} whose value is size {} was written with {} bytes.", key, value.length, wc);
-            if(wc > 0) {
-                channel.force(false);
-                keydir.put(key, handle, timestamp, pos);
-                return true;
-            }
+        byte[] metadata = ByteBuffer.allocate(20).putLong(1000L).putLong(timestamp).putInt(key.length()).array(), valueMetadata = ByteBuffer.allocate(4).putInt(value.length).array();
+        int wc = processChunk(metadata, buffer, channel, CHUNK_TYPE.HEADER) 
+                + processChunk(key.getBytes(StandardCharsets.UTF_8), buffer, channel, CHUNK_TYPE.KEY) 
+                + processChunk(valueMetadata, buffer, channel, CHUNK_TYPE.VALUE_LEN) 
+                + processChunk(value, buffer, channel, CHUNK_TYPE.VALUE);
+        if(wc != chunkSize) {
+            logger.error("put failed: chunk size and final disk write count didn't match");
+            logger.debug("wc={}, chunk_size={}", wc, chunkSize);
+            return false;
         }
-        return false;
+        keydir.put(key, handle, timestamp, pos);
+        return true;
     }
 
-    // todo: make write and keydir update atomic
-    private int writeChunks(ByteBuffer wbf, FileChannel channel, byte[] src) throws IOException {
-        int wc = 0, l = src.length, offset = 0;
-        /*
-            thought process:
-            2 cases can happen; 1 is when the buffer has enough space to accommodate the whole src, 
-            in which case we can just write it to the buffer and then write the buffer to the channel.
-            2nd case is when the buffer doesn't have enough space to accommodate the whole src, 
-            in which case we can write as much as we can to the buffer and then write the 
-            buffer to the channel, and then repeat this process until all bytes from src are written to the channel.    
-
-            eg for 1st case: src.length = 100, buffer.remaining() = 200, buffer filled in one go
-            eg for 2nd case: src.length = 100, buffer.remaining() = 50, buffer filled in two go's
-        */
-        while(wc < l) {
-            // carry out write if buffer is full or all bytes from src array is exhausted
-            if(!wbf.hasRemaining() || offset >= l) {
-                int n = channel.write(wbf.flip());
-                wc += n;
-                logger.info("disk write: {} bytes were written to store.log", n);
-                wbf.clear();
-            }
-            else {
-                int n = Math.min(wbf.remaining(), l - offset);
-                wbf.put(src, offset, n);
-                logger.info("write: {} bytes were written to buffer", n);
-                offset += n;
-            }
-        }
-        logger.info("a total of {} bytes were written into store.log", wc);
-        // for (int i=0; i<l; i+=8) {
-        //     logger.debug("writeChunk: i={}, src.length={}", i, l);
-        //     if(wbf.hasRemaining()) {
-        //         logger.info("before write: buffer remanining size: {}, buffer pos: {}", wbf.remaining(), wbf.position());
-        //         wbf.put(src, wbf.position(), Math.min(8, src.length-wbf.position()));
-        //         logger.info("after write: buffer remanining size: {}, buffer pos: {}", wbf.remaining(), wbf.position());
-        //     }
-        //     else {
-        //         wbf.flip();
-        //         wc += channel.write(wbf); // todo: log bytes written
-        //         logger.info("write count={} at pos={}", wc, wbf.position());
-        //         wbf.clear();
-        //     }
-        // }
-        // if(wbf.hasRemaining()) {
-        //     wbf.flip();
-        //     wc += channel.write(wbf); // todo: log bytes written
-        //     logger.info("write count={} at pos={}", wc, wbf.position());
-        // }
-        // wbf.clear();
-        return wc;
+    private int writeChunks(ByteBuffer wbf, FileChannel channel) throws IOException {
+        int write = channel.write(wbf.flip()); // todo: add forced flushing?
+        wbf.clear();
+        return write;
     }
 
     @Override
@@ -210,4 +153,40 @@ public class Engine implements Commands {
         }
     }
 
+    private int fillBuffer(byte[] data, int i) {
+        ByteBuffer bf = buffer;
+        while(i < data.length && bf.hasRemaining()) {
+            int count = Math.min(data.length - i, bf.remaining());
+            bf.put(data, i, count);
+            i += count;
+        }
+        return i;
+    }
+
+    private int processChunk(byte[] data, ByteBuffer wbf, FileChannel channel, CHUNK_TYPE chType) throws IOException {
+        logger.info("Processing chunk: {}", chType.name());
+        int wc = 0;
+        for (int i = 0, filled; i < data.length; i+=filled) {
+            filled = fillBuffer(data, i);
+            logger.debug("chType = {}, filled={}, buff_remaining={}", chType.name(), filled, wbf.remaining());
+            if(!wbf.hasRemaining()) {
+                int w = writeChunks(wbf, channel);
+                logger.info("{} bytes written to disk for chunk {}. left to write: {}", w, chType.name(), data.length - w);
+                wc += w;
+            }
+        }
+        if(wbf.remaining() < wbf.capacity()) {
+            int w = writeChunks(wbf, channel);
+            logger.info("{} bytes written to disk for chunk {}. left to write: {}", w, chType.name(), data.length - w);
+            wc += w;
+        }
+        return wc;
+    }
+
+    enum CHUNK_TYPE {
+        HEADER,
+        KEY,
+        VALUE_LEN,
+        VALUE
+    }
 }

@@ -155,30 +155,31 @@ public class Engine implements Commands {
 
     private int fillBuffer(byte[] data, int i) {
         ByteBuffer bf = buffer;
-        while(i < data.length && bf.hasRemaining()) {
-            int count = Math.min(data.length - i, bf.remaining());
-            bf.put(data, i, count);
-            i += count;
+        int j = i;
+        while(j < data.length && bf.hasRemaining()) {
+            int count = Math.min(data.length - j, bf.remaining());
+            bf.put(data, j, count);
+            j += count;
         }
-        return i;
+        return j-i;
     }
 
     private int processChunk(byte[] data, ByteBuffer wbf, FileChannel channel, CHUNK_TYPE chType) throws IOException {
         logger.info("Processing chunk: {}", chType.name());
         int wc = 0;
-        for (int i = 0, filled; i < data.length; i+=filled) {
+        for (int i = 0, filled; i < data.length; i+= filled) {
             filled = fillBuffer(data, i);
             logger.debug("chType = {}, filled={}, buff_remaining={}", chType.name(), filled, wbf.remaining());
             if(!wbf.hasRemaining()) {
                 int w = writeChunks(wbf, channel);
-                logger.info("{} bytes written to disk for chunk {}. left to write: {}", w, chType.name(), data.length - w);
                 wc += w;
+                logger.info("{} bytes written to disk for chunk {}. left to write: {}", w, chType.name(), data.length - wc);
             }
         }
         if(wbf.remaining() < wbf.capacity()) {
             int w = writeChunks(wbf, channel);
-            logger.info("{} bytes written to disk for chunk {}. left to write: {}", w, chType.name(), data.length - w);
             wc += w;
+            logger.info("{} bytes written to disk for chunk {}. left to write: {}", w, chType.name(), data.length - wc);
         }
         return wc;
     }

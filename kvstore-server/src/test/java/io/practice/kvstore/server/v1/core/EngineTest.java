@@ -66,5 +66,14 @@ public class EngineTest {
             byte[] res = engine.get(key);
             assertEquals(new String(value), new String(res));
         }
+
+        @Test
+        void ValueMoreThan2KBButNotPerfectlyDivisbleBy1024() throws IOException {
+            String key = "test";
+            byte[] value = new byte[5049];
+            assertTrue(engine.put(handle, key, value));
+            byte[] res = engine.get(key);
+            assertEquals(new String(value), new String(res));
+        }
     }
 }

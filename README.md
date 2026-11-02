@@ -9,8 +9,8 @@ Features in scope:
 
 
 Features not in scope:
-- Advanced features like compaction and merging.
-- Concurrency control and multi-threading.
+- Compaction and merge.
+- Concurrent readers.
 
 ## KVStore spec:
 
